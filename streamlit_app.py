@@ -191,7 +191,7 @@ col2.metric("Real Features", n_real_features)
 col3.metric("Total Features", n_total_features)
 
 st.write(f"**Number of Samples:** {n_samples}")
-st.write(f"**Correlation Strength (Real Features):** {real_feature_correlation}")
+st.write(f"**Correlation Strength (Real Features):** {alpha}")
 
 # --------------------------
 #   CONFUSION MATRIX
