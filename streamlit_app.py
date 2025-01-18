@@ -67,7 +67,7 @@ n_samples = st.sidebar.slider(
 # New slider for correlation strength of real features
 real_feature_correlation = st.sidebar.slider(
     "Correlation Strength of Real Features",
-    min_value=0.50,
+    min_value=-1.00,
     max_value=1.00,
     step=0.05,
     value=0.80,
