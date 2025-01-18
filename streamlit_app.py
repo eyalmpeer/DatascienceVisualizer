@@ -65,9 +65,9 @@ n_samples = st.sidebar.slider(
 )
 
 # New slider for correlation strength of real features
-real_feature_correlation = st.sidebar.slider(
+alpha = st.sidebar.slider(
     "Correlation Strength of Real Features",
-    min_value=-1.00,
+    min_value=0.00,
     max_value=1.00,
     step=0.05,
     value=0.80,
@@ -121,8 +121,10 @@ n_noisy_features = n_total_features - n_real_features if n_total_features > n_re
 # Generate real (informative) features
 # Correlation strength is controlled by 'real_feature_correlation'
 # The higher this is, the more separation between classes.
+alpha = real_feature_correlation  # in [0,1] range
+noise = np.random.normal(0, 1, size=n_samples)
 real_features = np.column_stack([
-    y + real_feature_correlation * np.random.normal(size=n_samples) 
+    alpha * y + (1 - alpha) * noise
     for _ in range(n_real_features)
 ])
 
