@@ -2,10 +2,6 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 
-# Visualization
-import matplotlib.pyplot as plt
-import seaborn as sns
-
 # Machine Learning
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
@@ -17,14 +13,24 @@ from sklearn.metrics import (
     auc
 )
 
+# Plotly for visualization
+import plotly.express as px
+import plotly.figure_factory as ff
+import plotly.graph_objects as go
+
 # --------------------------
 #       PAGE TITLE
 # --------------------------
-st.title("Interactive Logistic Regression Demonstration")
+st.title("Interactive Logistic Regression Demonstration (Plotly Version)")
 
 st.write("""
 This app demonstrates how Logistic Regression behaves with a mixture of *real* (informative) and *noisy* (uninformative) features.
-Experiment with different parameters in the sidebar to see how the performance changes.
+Use the sidebar to control:
+- How many real (informative) vs. noisy features there are
+- How large the dataset is
+- How strongly the real features correlate with the outcome
+- Model parameters like regularization strength, penalty type, and whether to scale features
+- And more...
 """)
 
 # --------------------------
@@ -56,6 +62,16 @@ n_samples = st.sidebar.slider(
     step=50, 
     value=200, 
     help="Number of data samples to generate."
+)
+
+# New slider for correlation strength of real features
+real_feature_correlation = st.sidebar.slider(
+    "Correlation Strength of Real Features",
+    min_value=0.50,
+    max_value=1.00,
+    step=0.05,
+    value=0.80,
+    help="Controls how strongly real features correlate with the outcome (0=none, 1=strong)."
 )
 
 st.sidebar.header("Model Parameters")
@@ -103,10 +119,11 @@ n_total_features = max(int(n_real_features / (percent_real_features / 100)), 1)
 n_noisy_features = n_total_features - n_real_features if n_total_features > n_real_features else 0
 
 # Generate real (informative) features
-# A simple approach: the real features have some correlation with y 
-# by shifting or scaling around the target.
+# Correlation strength is controlled by 'real_feature_correlation'
+# The higher this is, the more separation between classes.
 real_features = np.column_stack([
-    y + 0.8 * np.random.normal(size=n_samples) for _ in range(n_real_features)
+    y + real_feature_correlation * np.random.normal(size=n_samples) 
+    for _ in range(n_real_features)
 ])
 
 # Generate noisy (uninformative) features
@@ -148,12 +165,12 @@ else:
 # --------------------------
 model = LogisticRegression(
     C=regularization_strength, 
-    penalty=penalty_type if penalty_type != 'none' else 'l2',  # 'none' overrides penalty
-    solver='lbfgs' if penalty_type != 'none' else 'lbfgs', 
+    penalty=penalty_type if penalty_type != 'none' else 'l2', 
+    solver='lbfgs', 
     max_iter=1000
 )
-# If 'none' is selected, set penalty to none
 if penalty_type == 'none':
+    # Overwrite penalty to 'none'
     model.set_params(penalty='none')
 
 model.fit(X_train, y_train)
@@ -173,15 +190,28 @@ col2.metric("Real Features", n_real_features)
 col3.metric("Total Features", n_total_features)
 
 st.write(f"**Number of Samples:** {n_samples}")
+st.write(f"**Correlation Strength (Real Features):** {real_feature_correlation}")
 
-# Confusion Matrix
+# --------------------------
+#   CONFUSION MATRIX
+# --------------------------
 cm = confusion_matrix(y_test, y_pred)
-fig, ax = plt.subplots()
-sns.heatmap(cm, annot=True, fmt='d', cmap="Blues", cbar=False, ax=ax)
-ax.set_xlabel("Predicted")
-ax.set_ylabel("Actual")
-ax.set_title("Confusion Matrix")
-st.pyplot(fig)
+
+# Create a Plotly annotated heatmap
+cm_fig = ff.create_annotated_heatmap(
+    z=cm,
+    x=["Predicted 0", "Predicted 1"],
+    y=["Actual 0", "Actual 1"],
+    colorscale="Blues",
+    showscale=True,
+    reversescale=False
+)
+cm_fig.update_layout(
+    title="Confusion Matrix",
+    margin=dict(l=50, r=50, t=50, b=50)
+)
+cm_fig.update_yaxes(autorange="reversed")  # So labels read top-to-bottom
+st.plotly_chart(cm_fig, use_container_width=True)
 
 # --------------------------
 #   ROC CURVE & AUC
@@ -190,28 +220,35 @@ y_pred_prob = model.predict_proba(X_test)[:, 1]
 fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob)
 roc_auc = auc(fpr, tpr)
 
-fig_roc, ax_roc = plt.subplots()
-ax_roc.plot(fpr, tpr, color="darkorange", lw=2, label=f"ROC curve (AUC = {roc_auc:.3f})")
-ax_roc.plot([0, 1], [0, 1], color="navy", lw=1, linestyle="--")
-ax_roc.set_xlim([0.0, 1.0])
-ax_roc.set_ylim([0.0, 1.05])
-ax_roc.set_xlabel("False Positive Rate")
-ax_roc.set_ylabel("True Positive Rate")
-ax_roc.set_title("Receiver Operating Characteristic")
-ax_roc.legend(loc="lower right")
-st.pyplot(fig_roc)
+roc_fig = go.Figure()
+roc_fig.add_trace(go.Scatter(
+    x=fpr, 
+    y=tpr, 
+    mode='lines', 
+    line=dict(color='darkorange', width=2),
+    name=f"ROC curve (AUC = {roc_auc:.3f})"
+))
+roc_fig.add_shape(
+    type="line", 
+    x0=0, 
+    y0=0, 
+    x1=1, 
+    y1=1,
+    line=dict(color="navy", width=1, dash="dash")
+)
+roc_fig.update_layout(
+    title="ROC Curve",
+    xaxis_title="False Positive Rate",
+    yaxis_title="True Positive Rate",
+    legend=dict(x=0.6, y=0.05)
+)
+st.plotly_chart(roc_fig, use_container_width=True)
 
 # --------------------------
 #   FEATURE IMPORTANCE
 # --------------------------
-# For logistic regression, feature importance can be seen via coefficients
-if penalty_type != 'none':
-    coefs = model.coef_[0]
-else:
-    # If penalty='none', no regularization is used; coefficients are still available
-    coefs = model.coef_[0]
+coefs = model.coef_[0]
 
-# Create a DataFrame for the feature importances
 feature_importances = pd.DataFrame({
     "Feature": all_feature_names, 
     "Coefficient": coefs
@@ -223,11 +260,37 @@ Features with higher positive coefficients push the model toward predicting the 
 while more negative coefficients push toward the negative class (0).
 """)
 
-fig_imp, ax_imp = plt.subplots(figsize=(6, 4))
-sns.barplot(data=feature_importances, x="Coefficient", y="Feature", ax=ax_imp, palette="viridis")
-ax_imp.axvline(x=0, color='gray', linestyle='--')
-ax_imp.set_title("Logistic Regression Coefficients")
-st.pyplot(fig_imp)
+# Create a horizontal bar chart with Plotly
+imp_fig = go.Figure()
+imp_fig.add_trace(go.Bar(
+    x=feature_importances["Coefficient"],
+    y=feature_importances["Feature"],
+    orientation='h',
+    marker=dict(
+        color=feature_importances["Coefficient"],
+        colorscale='Viridis'
+    ),
+))
+imp_fig.update_layout(
+    title="Logistic Regression Coefficients",
+    xaxis_title="Coefficient",
+    yaxis_title="Feature",
+    margin=dict(l=100, r=30, t=50, b=50)
+)
+# Draw a vertical line at x=0 for reference
+imp_fig.add_shape(
+    dict(
+        type="line", 
+        x0=0, 
+        x1=0, 
+        y0=0, 
+        y1=1, 
+        line=dict(color="gray", width=1, dash="dash"),
+        xref="x", 
+        yref="paper"
+    )
+)
+st.plotly_chart(imp_fig, use_container_width=True)
 
 # --------------------------
 #   CORRELATION ANALYSIS
@@ -235,10 +298,14 @@ st.pyplot(fig_imp)
 with st.expander("Show Correlation Heatmap (Real vs. Noisy Features)"):
     st.write("Correlation matrix of all features and the target.")
     corr_matrix = df.corr()
-    fig_corr, ax_corr = plt.subplots(figsize=(8, 6))
-    sns.heatmap(corr_matrix, annot=False, cmap="RdBu_r", ax=ax_corr, center=0)
-    ax_corr.set_title("Correlation Heatmap")
-    st.pyplot(fig_corr)
+    corr_fig = px.imshow(
+        corr_matrix, 
+        text_auto=False, 
+        aspect="auto", 
+        color_continuous_scale="RdBu_r", 
+        title="Correlation Heatmap"
+    )
+    st.plotly_chart(corr_fig, use_container_width=True)
 
 st.write("---")
 st.write("Feel free to adjust the parameters in the sidebar and observe how these plots and metrics change!")
