@@ -121,7 +121,6 @@ n_noisy_features = n_total_features - n_real_features if n_total_features > n_re
 # Generate real (informative) features
 # Correlation strength is controlled by 'real_feature_correlation'
 # The higher this is, the more separation between classes.
-alpha = real_feature_correlation  # in [0,1] range
 noise = np.random.normal(0, 1, size=n_samples)
 real_features = np.column_stack([
     alpha * y + (1 - alpha) * noise
