@@ -9,7 +9,7 @@ st.title("Interactive Logistic Regression Demonstration")
 
 # Sidebar for Parameters
 n_real_features = st.sidebar.slider("Number of Real Features", min_value=1, max_value=10, value=1)
-percent_real_features = st.sidebar.slider("Percent of Real Features", min_value=0.01, max_value=100, step=10, value=50)
+percent_real_features = st.sidebar.slider("Percent of Real Features", min_value=1, max_value=100, step=1, value=50)
 n_samples = st.sidebar.slider("Number of Samples", min_value=50, max_value=1000, step=50, value=100)
 
 # Derived Parameters
